@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Support Inbox</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #1a1a1a; }
+
+    .topbar {
+      background: white; border-bottom: 1px solid #e5e5e5;
+      padding: 14px 24px; display: flex; align-items: center; gap: 12px;
+    }
+    .topbar h1 { font-size: 16px; font-weight: 600; }
+    .badge { font-size: 11px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+    .badge-live { background: #dcfce7; color: #15803d; }
+
+    .container { max-width: 900px; margin: 24px auto; padding: 0 16px; }
+
+    .ticket-card {
+      background: white; border-radius: 10px;
+      border: 1px solid #e5e5e5; margin-bottom: 14px; overflow: hidden;
+    }
+    .ticket-header {
+      padding: 14px 18px; display: flex;
+      align-items: flex-start; justify-content: space-between; gap: 12px;
+    }
+    .ticket-from { font-size: 13px; font-weight: 600; }
+    .ticket-subject { font-size: 12px; color: #666; margin-top: 2px; }
+    .ticket-time { font-size: 11px; color: #999; white-space: nowrap; }
+
+    .badges { display: flex; gap: 6px; padding: 0 18px 10px; flex-wrap: wrap; }
+    .b-billing   { background: #ede9fe; color: #5b21b6; }
+    .b-technical { background: #dbeafe; color: #1e40af; }
+    .b-account   { background: #d1fae5; color: #065f46; }
+    .b-urgent { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+    .b-high   { background: #fef3c7; color: #92400e; }
+    .b-normal { background: #f3f4f6; color: #374151; }
+    .b-low    { background: #f0fdf4; color: #166534; }
+    .b-processing { background: #f3f4f6; color: #9ca3af; }
+
+    .ticket-body {
+      padding: 0 18px 12px;
+      font-size: 12px; color: #555; line-height: 1.6;
+    }
+
+    .draft-box {
+      margin: 0 18px 14px; background: #f9fafb;
+      border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px;
+    }
+    .draft-label {
+      font-size: 10px; color: #9ca3af; text-transform: uppercase;
+      letter-spacing: 0.05em; margin-bottom: 6px;
+    }
+    .draft-text { font-size: 12px; color: #1f2937; line-height: 1.7; }
+    .draft-actions { display: flex; gap: 8px; margin-top: 10px; }
+    .btn {
+      font-size: 12px; padding: 5px 12px; border-radius: 6px;
+      border: 1px solid #d1d5db; background: white; cursor: pointer;
+      color: #374151; transition: background 0.1s;
+    }
+    .btn:hover { background: #f3f4f6; }
+    .btn-approve {
+      background: #dcfce7; color: #15803d;
+      border-color: #86efac;
+    }
+    .btn-approve:hover { background: #bbf7d0; }
+    .btn-approve.done { opacity: 0.6; cursor: default; }
+
+    .reasoning {
+      font-size: 11px; color: #9ca3af; align-self: center;
+    }
+
+    .empty { text-align: center; padding: 60px; color: #9ca3af; }
+    .empty .icon { font-size: 36px; margin-bottom: 12px; }
+
+    /* Auto-refresh indicator */
+    .refresh-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #22c55e; display: inline-block;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.3; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <span style="font-size:20px">📨</span>
+  <h1>Support inbox</h1>
+  <span class="badge badge-live"><span class="refresh-dot"></span> Live</span>
+  <span id="ticket-count" style="font-size:12px; color:#666; margin-left:auto"></span>
+</div>
+
+<div class="container">
+  <div id="tickets-container">
+
+    {% if tickets %}
+      {% for t in tickets %}
+      <div class="ticket-card" id="ticket-{{ t.id }}">
+        <div class="ticket-header">
+          <div>
+            <div class="ticket-from">{{ t.sender }}</div>
+            <div class="ticket-subject">{{ t.subject or "(no subject)" }}</div>
+          </div>
+          <div class="ticket-time">{{ t.created_at }}</div>
+        </div>
+
+        <div class="badges">
+          {% if t.category %}
+            <span class="badge b-{{ t.category }}">{{ t.category }}</span>
+          {% endif %}
+          {% if t.urgency %}
+            <span class="badge b-{{ t.urgency }}">{{ t.urgency }}</span>
+          {% endif %}
+          {% if not t.category %}
+            <span class="badge b-processing">Classifying...</span>
+          {% endif %}
+          {% if t.reasoning %}
+            <span class="reasoning">{{ t.reasoning }}</span>
+          {% endif %}
+        </div>
+
+        <div class="ticket-body">
+          {{ t.body[:200] }}{% if t.body|length > 200 %}…{% endif %}
+        </div>
+
+        {% if t.draft %}
+        <div class="draft-box">
+          <div class="draft-label">✍️ Draft response</div>
+          <div class="draft-text">{{ t.draft }}</div>
+          <div class="draft-actions">
+            {% if t.approved %}
+              <button class="btn btn-approve done">✓ Sent</button>
+            {% else %}
+              <button class="btn btn-approve"
+                onclick="approveTicket({{ t.id }}, this)">
+                ✓ Approve & send
+              </button>
+            {% endif %}
+          </div>
+        </div>
+        {% elif t.category %}
+        <div class="draft-box">
+          <div class="draft-label">✍️ Drafting response...</div>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="empty">
+        <div class="icon">📭</div>
+        <p>No tickets yet. Send a test email via webhook.py or POST to /webhook/email</p>
+      </div>
+    {% endif %}
+
+  </div>
+</div>
+
+<script>
+  // Auto-refresh every 3 seconds to show new tickets / agent updates
+  setInterval(async () => {
+    const res = await fetch('/api/tickets');
+    const tickets = await res.json();
+
+    document.getElementById('ticket-count').textContent =
+      tickets.length + ' ticket' + (tickets.length !== 1 ? 's' : '');
+
+    // Only reload the page if there are new tickets (simple check)
+    const current = document.querySelectorAll('.ticket-card').length;
+    if (tickets.length !== current) {
+      location.reload();
+    }
+  }, 3000);
+
+  async function approveTicket(id, btn) {
+    btn.textContent = 'Sending...';
+    btn.disabled = true;
+    await fetch('/api/tickets/' + id + '/approve', { method: 'POST' });
+    btn.textContent = '✓ Sent';
+    btn.className = 'btn btn-approve done';
+  }
+</script>
+
+</body>
+</html>
